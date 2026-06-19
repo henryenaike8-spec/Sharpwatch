@@ -2,7 +2,7 @@
   "name": "SHARPWATCH — Polymarket Wallet Tracker",
   "short_name": "SHARPWATCH",
   "description": "Scan, track, and get live alerts on sharp Polymarket traders",
-  "start_url": "./sharpwatch.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#06070a",
