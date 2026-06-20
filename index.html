@@ -291,6 +291,23 @@
     </div>
 
     <div class="panel">
+      <h2>Telegram Alerts (always-on) <span class="tag">works even when this app is closed</span></h2>
+      <div class="row">
+        <div class="field" style="flex:1;">
+          <label>Your Netlify Site URL (e.g. https://sharpwatch-app.netlify.app)</label>
+          <input type="text" id="backendUrl" placeholder="https://your-site.netlify.app" style="width:100%;">
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button id="syncTelegramBtn" class="gold">⇪ Sync to Telegram Backend</button>
+        </div>
+      </div>
+      <div id="syncStatus" style="font-size:11px; color:var(--muted); margin-top:4px;"></div>
+      <div style="font-size:10px; color:var(--muted); margin-top:8px; line-height:1.6;">
+        One-time setup: message <b style="color:var(--gold);">@BotFather</b> on Telegram to create a bot and get a token. Message <b style="color:var(--gold);">@userinfobot</b> to get your chat ID. Add both as <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> in your Netlify site's Environment Variables. After that, every time you click "Sync" here, your tracked list updates on the server — and a background job checks for new trades every minute and messages you on Telegram, with no app or browser tab needed open.
+      </div>
+    </div>
+
+    <div class="panel">
       <h2>Live Alert Feed <span class="tag" id="feedTag">waiting for trades...</span></h2>
       <div id="feed" class="scroll">
         <div class="empty">Start watching to see live trades from tracked wallets.</div>
@@ -602,6 +619,45 @@ function playBeep(){
     o.stop(audioCtx.currentTime + 0.22);
   }catch(e){ console.warn('beep failed', e); }
 }
+
+// ---------- TELEGRAM BACKEND SYNC ----------
+const backendUrlInput = document.getElementById('backendUrl');
+backendUrlInput.value = localStorage.getItem('sw_backend_url') || '';
+backendUrlInput.addEventListener('change', () => {
+  localStorage.setItem('sw_backend_url', backendUrlInput.value.trim());
+});
+
+document.getElementById('syncTelegramBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('syncStatus');
+  let base = backendUrlInput.value.trim().replace(/\/$/, '');
+  if(!base){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Enter your Netlify site URL first.';
+    return;
+  }
+  localStorage.setItem('sw_backend_url', base);
+  if(tracked.length === 0){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Track at least one wallet before syncing.';
+    return;
+  }
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Syncing...';
+  try{
+    const res = await fetch(`${base}/.netlify/functions/sync-wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallets: tracked.map(t => ({ wallet: t.wallet, name: t.name })) })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `Synced ${data.tracked} wallet(s) — background checks every minute now.`;
+  }catch(e){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Sync failed: ' + e.message;
+  }
+});
 
 // ---------- INIT ----------
 document.getElementById('alertCount').textContent = alertLog;
