@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHARPWATCH // Polymarket Wallet Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#06070a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SHARPWATCH">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<style>
+  :root{
+    --bg:#06070a;
+    --panel:#0c0f14;
+    --panel2:#11151c;
+    --line:#1c2230;
+    --cyan:#33fff0;
+    --cyan-dim:#1aa39a;
+    --gold:#ffcf5c;
+    --red:#ff4d6a;
+    --green:#3dffa0;
+    --text:#dfe6ec;
+    --muted:#6b7686;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(circle at 20% 0%, #0d1320 0%, #06070a 55%);
+    color:var(--text);
+    font-family:'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    font-size:13px;
+    min-height:100vh;
+  }
+  @font-face{ font-family:'JetBrains Mono'; src: local('JetBrains Mono'); }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 24px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, #0a0d12, #07090d);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .dot{ width:9px;height:9px;border-radius:50%;background:var(--cyan); box-shadow:0 0 12px var(--cyan); animation:pulse 2s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .brand h1{
+    font-size:16px; letter-spacing:3px; margin:0; font-weight:700;
+    color:var(--text);
+  }
+  .brand h1 span{ color:var(--cyan); }
+  .status{ font-size:11px; color:var(--muted); letter-spacing:1px; }
+  .status b{ color:var(--gold); }
+
+  .layout{
+    display:grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap:16px;
+    padding:20px 24px;
+  }
+  @media (max-width: 980px){ .layout{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    margin-bottom:16px;
+  }
+  .panel h2{
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--cyan); margin:0 0 12px 0; font-weight:700;
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel h2 .tag{ color:var(--muted); font-weight:400; letter-spacing:0; text-transform:none; font-size:10px; }
+
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  label{ font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; display:block; margin-bottom:4px; }
+  select, input[type=text], input[type=number]{
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    padding:7px 9px; border-radius:6px; font-family:inherit; font-size:12px;
+    outline:none;
+  }
+  select:focus, input:focus{ border-color:var(--cyan-dim); }
+  .field{ display:flex; flex-direction:column; }
+
+  button{
+    background:transparent; border:1px solid var(--cyan-dim); color:var(--cyan);
+    padding:8px 14px; border-radius:6px; font-family:inherit; font-size:11px;
+    letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+    transition:all .15s;
+  }
+  button:hover{ background:rgba(51,255,240,.08); box-shadow:0 0 10px rgba(51,255,240,.2); }
+  button.gold{ border-color:var(--gold); color:var(--gold); }
+  button.gold:hover{ background:rgba(255,207,92,.08); }
+  button.ghost{ border-color:var(--line); color:var(--muted); }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+
+  table{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  th{ text-align:left; color:var(--muted); font-weight:500; letter-spacing:1px; text-transform:uppercase; font-size:9.5px; padding:6px 8px; border-bottom:1px solid var(--line); }
+  td{ padding:7px 8px; border-bottom:1px solid #161a22; vertical-align:middle; }
+  tr:hover td{ background:rgba(51,255,240,.03); }
+  .mono-addr{ color:var(--muted); font-size:10.5px; }
+  .pos{ color:var(--green); }
+  .neg{ color:var(--red); }
+  .pct-pill{
+    display:inline-block; padding:2px 7px; border-radius:20px; font-size:10.5px; font-weight:700;
+    background:rgba(61,255,160,.1); color:var(--green); border:1px solid rgba(61,255,160,.3);
+  }
+  .pct-pill.low{ background:rgba(255,77,106,.08); color:var(--red); border-color:rgba(255,77,106,.25); }
+
+  .scroll{ max-height:380px; overflow-y:auto; }
+  .scroll::-webkit-scrollbar{ width:6px; }
+  .scroll::-webkit-scrollbar-thumb{ background:var(--line); border-radius:3px; }
+
+  .tracked-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 10px; border:1px solid var(--line); border-radius:7px; margin-bottom:7px;
+    background:var(--panel2);
+  }
+  .tracked-item .name{ font-size:12px; color:var(--text); }
+  .tracked-item .meta{ font-size:10px; color:var(--muted); }
+  .tracked-item .x{ color:var(--muted); cursor:pointer; font-size:14px; padding:2px 6px; }
+  .tracked-item .x:hover{ color:var(--red); }
+
+  .feed-item{
+    border-left:2px solid var(--cyan-dim); padding:8px 10px 8px 12px; margin-bottom:8px;
+    background:var(--panel2); border-radius:0 6px 6px 0; font-size:11.5px;
+    animation:slidein .25s ease;
+  }
+  .feed-item.flash{ animation: flashIn .9s ease; border-left-color:var(--gold); }
+  @keyframes slidein{ from{ opacity:0; transform:translateX(-6px); } to{ opacity:1; transform:translateX(0);} }
+  @keyframes flashIn{ 0%{ background:rgba(255,207,92,.25); } 100%{ background:var(--panel2); } }
+  .feed-item .top{ display:flex; justify-content:space-between; color:var(--muted); font-size:10px; margin-bottom:4px; }
+  .feed-item .side-buy{ color:var(--green); font-weight:700; }
+  .feed-item .side-sell{ color:var(--red); font-weight:700; }
+  .feed-item .title{ color:var(--text); }
+
+  .empty{ color:var(--muted); font-size:11.5px; padding:18px 4px; text-align:center; }
+
+  .checkbox{ width:16px; height:16px; accent-color:var(--cyan); cursor:pointer; }
+
+  .footer-note{ font-size:10px; color:var(--muted); line-height:1.6; padding:14px 24px 30px; border-top:1px solid var(--line); }
+  .footer-note b{ color:var(--gold); }
+
+  .toggle-row{ display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
+  .toggle-row input{ accent-color:var(--cyan); }
+
+  .badge{ font-size:9px; padding:1px 6px; border-radius:10px; border:1px solid var(--line); color:var(--muted); letter-spacing:1px; }
+  .badge.live{ border-color:var(--green); color:var(--green); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="dot"></div>
+    <h1>SHARP<span>WATCH</span></h1>
+  </div>
+  <div class="status">POOL: <b id="poolCount">0</b> SCANNED &nbsp;|&nbsp; TRACKED: <b id="trackedCount">0</b> &nbsp;|&nbsp; ALERTS: <b id="alertCount">0</b> &nbsp;|&nbsp; <span id="pollStatus" class="badge">IDLE</span> &nbsp;<button id="installBtn" class="gold" style="display:none; padding:5px 11px; font-size:10px;">⬇ Install App</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT COLUMN: SCANNER + RESULTS -->
+  <div>
+    <div class="panel">
+      <h2>Scanner <span class="tag">find sharp wallets from the leaderboard</span></h2>
+      <div class="row">
+        <div class="field">
+          <label>Category</label>
+          <select id="category">
+            <option value="OVERALL">Overall</option>
+            <option value="POLITICS">Politics</option>
+            <option value="SPORTS">Sports</option>
+            <option value="CRYPTO">Crypto</option>
+            <option value="CULTURE">Culture</option>
+            <option value="ECONOMICS">Economics</option>
+            <option value="FINANCE">Finance</option>
+            <option value="TECH">Tech</option>
+            <option value="WEATHER">Weather</option>
+            <option value="MENTIONS">Mentions</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Time Period</label>
+          <select id="timePeriod">
+            <option value="ALL">All Time</option>
+            <option value="MONTH">Month</option>
+            <option value="WEEK">Week</option>
+            <option value="DAY">Day</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Order By</label>
+          <select id="orderBy">
+            <option value="PNL">PnL</option>
+            <option value="VOL">Volume</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Pool Size</label>
+          <select id="poolSize">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="200">200</option>
+            <option value="300">300</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Min Win Rate %</label>
+          <input type="number" id="minWinRate" value="80" min="0" max="100" style="width:80px;">
+        </div>
+        <div class="field">
+          <label>Min Closed Trades</label>
+          <input type="number" id="minTrades" value="15" min="1" max="50" style="width:80px;">
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button id="scanBtn" class="gold">▸ Run Scan</button>
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <span id="scanProgress" style="font-size:10px;color:var(--muted);"></span>
+        </div>
+      </div>
+      <div id="scanError" style="display:none; font-size:11px; color:var(--gold); margin-top:6px;"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Qualifying Wallets <span class="tag">≥ min win rate, regularly trading</span></h2>
+      <div class="scroll">
+        <table id="resultsTable">
+          <thead><tr>
+            <th></th><th>Trader</th><th>Win%</th><th>Closed</th><th>PnL</th><th>Vol</th><th>Verify</th><th></th>
+          </tr></thead>
+          <tbody id="resultsBody">
+            <tr><td colspan="7"><div class="empty">Run a scan to find qualifying wallets.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Add Wallet Manually</h2>
+      <div class="row">
+        <input type="text" id="manualWallet" placeholder="0x..." style="flex:1; min-width:240px;">
+        <button id="manualAddBtn">+ Track</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: TRACKED + LIVE FEED -->
+  <div>
+    <div class="panel">
+      <h2>Tracked Wallets <span class="tag" id="trackedTag">0 watching</span></h2>
+      <div id="trackedList" class="scroll">
+        <div class="empty">No wallets tracked yet. Scan or add manually.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Alert Settings</h2>
+      <div class="row">
+        <div class="toggle-row"><input type="checkbox" id="soundToggle" checked> Sound</div>
+        <div class="toggle-row"><input type="checkbox" id="notifToggle" checked> Browser notification</div>
+        <div class="toggle-row"><input type="checkbox" id="flashToggle" checked> Flash feed</div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Poll Interval (sec)</label>
+          <input type="number" id="pollInterval" value="20" min="8" max="300" style="width:80px;">
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button id="startPollBtn" class="gold">▸ Start Watching</button>
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button id="stopPollBtn" class="ghost">■ Stop</button>
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button id="notifPermBtn" class="ghost">Enable Notifications</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;">
+          <label>CORS Proxy Prefix (optional — leave blank unless direct fetch is blocked)</label>
+          <input type="text" id="corsProxy" placeholder="e.g. https://your-proxy.netlify.app/api/?url=" style="width:100%;">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Telegram Alerts (always-on) <span class="tag">works even when this app is closed</span></h2>
+      <div class="row">
+        <div class="field" style="flex:1;">
+          <label>Your Netlify Site URL (e.g. https://sharpwatch-app.netlify.app)</label>
+          <input type="text" id="backendUrl" placeholder="https://your-site.netlify.app" style="width:100%;">
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button id="syncTelegramBtn" class="gold">⇪ Sync to Telegram Backend</button>
+        </div>
+      </div>
+      <div id="syncStatus" style="font-size:11px; color:var(--muted); margin-top:4px;"></div>
+      <div style="font-size:10px; color:var(--muted); margin-top:8px; line-height:1.6;">
+        One-time setup: message <b style="color:var(--gold);">@BotFather</b> on Telegram to create a bot and get a token. Message <b style="color:var(--gold);">@userinfobot</b> to get your chat ID. Add both as <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> in your Netlify site's Environment Variables. After that, every time you click "Sync" here, your tracked list updates on the server — and a background job checks for new trades every minute and messages you on Telegram, with no app or browser tab needed open.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Alert Feed <span class="tag" id="feedTag">waiting for trades...</span></h2>
+      <div id="feed" class="scroll">
+        <div class="empty">Start watching to see live trades from tracked wallets.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer-note">
+  <b>Note:</b> "Win rate" is computed client-side from each wallet's <code>/closed-positions</code> (realizedPnl &gt; 0 vs &lt; 0) — Polymarket doesn't expose win rate directly, so this is a best-effort proxy, not an official stat. Past performance on resolved markets doesn't guarantee future trades will be sized or timed the same way. Open your browser console to see raw API responses if results look off — Polymarket's API can change shape without notice. This tool reads public on-chain data only; it does not place trades.
+</div>
+
+<script>
+const DATA_API = "https://data-api.polymarket.com";
+
+function corsPrefix(){
+  return document.getElementById('corsProxy').value.trim();
+}
+async function apiGet(path){
+  const prefix = corsPrefix();
+  const url = prefix ? (prefix + encodeURIComponent(DATA_API + path)) : (DATA_API + path);
+  const res = await fetch(url);
+  if(!res.ok){ throw new Error('HTTP ' + res.status); }
+  const json = await res.json();
+  console.log('[SHARPWATCH]', path, json);
+  return json;
+}
+
+// ---------- STATE ----------
+let tracked = JSON.parse(localStorage.getItem('sw_tracked') || '[]'); // [{wallet, name, lastSeenTs, lastSeenTx}]
+let alertLog = JSON.parse(localStorage.getItem('sw_alertcount') || '0');
+let pollHandle = null;
+let pollIdx = 0;
+
+function saveTracked(){
+  localStorage.setItem('sw_tracked', JSON.stringify(tracked));
+  renderTracked();
+}
+function saveAlertCount(){
+  localStorage.setItem('sw_alertcount', String(alertLog));
+  document.getElementById('alertCount').textContent = alertLog;
+}
+
+// ---------- WIN RATE COMPUTATION ----------
+async function computeWinRate(wallet){
+  // fetch up to 50 closed positions sorted by most recent
+  let positions;
+  try{
+    positions = await apiGet(`/closed-positions?user=${wallet}&limit=50&sortBy=TIMESTAMP&sortDirection=DESC`);
+  }catch(e){
+    console.warn('closed-positions failed for', wallet, e);
+    return null;
+  }
+  if(!Array.isArray(positions) || positions.length === 0) return { winRate: null, closed: 0, wins: 0, losses: 0 };
+
+  let wins = 0, losses = 0;
+  for(const p of positions){
+    // Defensive: realizedPnl is the documented field; fall back to alt names if API shape drifts
+    const pnl = (typeof p.realizedPnl === 'number') ? p.realizedPnl
+              : (typeof p.cashPnl === 'number') ? p.cashPnl
+              : (typeof p.pnl === 'number') ? p.pnl
+              : null;
+    if(pnl === null) continue;
+    if(pnl > 0) wins++;
+    else if(pnl < 0) losses++;
+  }
+  const total = wins + losses;
+  return { winRate: total > 0 ? (wins/total*100) : null, closed: total, wins, losses };
+}
+
+// ---------- SCANNER ----------
+document.getElementById('scanBtn').addEventListener('click', runScan);
+
+async function runScan(){
+  const errBox = document.getElementById('scanError');
+  errBox.style.display = 'none';
+  const category = document.getElementById('category').value;
+  const timePeriod = document.getElementById('timePeriod').value;
+  const orderBy = document.getElementById('orderBy').value;
+  const poolSize = parseInt(document.getElementById('poolSize').value, 10);
+  const minWinRate = parseFloat(document.getElementById('minWinRate').value);
+  const minTrades = parseInt(document.getElementById('minTrades').value, 10);
+
+  const scanBtn = document.getElementById('scanBtn');
+  scanBtn.disabled = true;
+  const progress = document.getElementById('scanProgress');
+  const resultsBody = document.getElementById('resultsBody');
+  resultsBody.innerHTML = `<tr><td colspan="7"><div class="empty">Pulling leaderboard...</div></td></tr>`;
+
+  // 1. Pull leaderboard in pages of 50 (API max)
+  let pool = [];
+  try{
+    for(let offset = 0; offset < poolSize; offset += 50){
+      const limit = Math.min(50, poolSize - offset);
+      const page = await apiGet(`/v1/leaderboard?category=${category}&timePeriod=${timePeriod}&orderBy=${orderBy}&limit=${limit}&offset=${offset}`);
+      if(!Array.isArray(page) || page.length === 0) break;
+      pool = pool.concat(page);
+      await sleep(150);
+    }
+  }catch(e){
+    errBox.style.display = 'block';
+    errBox.textContent = 'Leaderboard fetch failed: ' + e.message + ' — if this is a CORS error, try setting a CORS proxy prefix below, or check your network egress settings.';
+    scanBtn.disabled = false;
+    return;
+  }
+
+  document.getElementById('poolCount').textContent = pool.length;
+
+  // 2. For each wallet, compute win rate (staggered to respect rate limits)
+  const qualifying = [];
+  for(let i = 0; i < pool.length; i++){
+    const trader = pool[i];
+    progress.textContent = `checking ${i+1}/${pool.length}...`;
+    const stats = await computeWinRate(trader.proxyWallet);
+    await sleep(120); // stagger requests
+    if(!stats || stats.winRate === null) continue;
+    if(stats.closed >= minTrades && stats.winRate >= minWinRate){
+      qualifying.push({ ...trader, ...stats });
+    }
+  }
+  progress.textContent = `done — ${qualifying.length} qualify`;
+  scanBtn.disabled = false;
+
+  renderResults(qualifying);
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function renderResults(list){
+  const body = document.getElementById('resultsBody');
+  if(list.length === 0){
+    body.innerHTML = `<tr><td colspan="7"><div class="empty">No wallets matched your filters. Try lowering min win rate or min trades.</div></td></tr>`;
+    return;
+  }
+  list.sort((a,b) => b.winRate - a.winRate);
+  body.innerHTML = list.map(t => {
+    const isTracked = tracked.some(x => x.wallet.toLowerCase() === t.proxyWallet.toLowerCase());
+    return `<tr>
+      <td><input type="checkbox" class="checkbox track-cb" data-wallet="${t.proxyWallet}" data-name="${escapeHtml(t.userName||t.proxyWallet.slice(0,8))}" ${isTracked?'checked disabled':''}></td>
+      <td>${escapeHtml(t.userName || '—')} ${t.verifiedBadge?'<span title="Polymarket verified badge" style="color:var(--gold)">✓</span>':''}<br><span class="mono-addr">${shortAddr(t.proxyWallet)}</span></td>
+      <td><span class="pct-pill">${t.winRate.toFixed(1)}%</span></td>
+      <td>${t.closed}</td>
+      <td class="${t.pnl>=0?'pos':'neg'}">$${fmtNum(t.pnl)}</td>
+      <td>$${fmtNum(t.vol)}</td>
+      <td><a href="https://polymarket.com/profile/${t.proxyWallet}" target="_blank" rel="noopener" style="color:var(--cyan); text-decoration:none; font-size:11px;">view ↗</a></td>
+      <td><button class="trackbtn ghost" data-wallet="${t.proxyWallet}" data-name="${escapeHtml(t.userName||t.proxyWallet.slice(0,8))}" ${isTracked?'disabled':''}>${isTracked?'tracked':'+ track'}</button></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('.trackbtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      addTracked(btn.dataset.wallet, btn.dataset.name);
+      btn.disabled = true; btn.textContent = 'tracked';
+    });
+  });
+}
+
+function shortAddr(a){ return a.slice(0,6) + '...' + a.slice(-4); }
+function fmtNum(n){ if(n===undefined||n===null) return '0'; const v = Math.abs(n); const s = v>=1000000? (v/1000000).toFixed(2)+'M' : v>=1000? (v/1000).toFixed(1)+'K' : v.toFixed(0); return (n<0?'-':'')+s; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------- TRACKED WALLETS ----------
+function addTracked(wallet, name){
+  if(tracked.some(t => t.wallet.toLowerCase() === wallet.toLowerCase())) return;
+  tracked.push({ wallet, name: name || shortAddr(wallet), lastSeenTs: Math.floor(Date.now()/1000), lastSeenTx: null });
+  saveTracked();
+}
+function removeTracked(wallet){
+  tracked = tracked.filter(t => t.wallet.toLowerCase() !== wallet.toLowerCase());
+  saveTracked();
+}
+function renderTracked(){
+  const el = document.getElementById('trackedList');
+  document.getElementById('trackedCount').textContent = tracked.length;
+  document.getElementById('trackedTag').textContent = `${tracked.length} watching`;
+  if(tracked.length === 0){
+    el.innerHTML = `<div class="empty">No wallets tracked yet. Scan or add manually.</div>`;
+    return;
+  }
+  el.innerHTML = tracked.map(t => `
+    <div class="tracked-item">
+      <div>
+        <div class="name">${escapeHtml(t.name)}</div>
+        <div class="meta"><a href="https://polymarket.com/profile/${t.wallet}" target="_blank" rel="noopener" style="color:var(--cyan); text-decoration:none;">${shortAddr(t.wallet)} ↗</a></div>
+      </div>
+      <div class="x" data-wallet="${t.wallet}">✕</div>
+    </div>`).join('');
+  el.querySelectorAll('.x').forEach(x => x.addEventListener('click', () => removeTracked(x.dataset.wallet)));
+}
+
+document.getElementById('manualAddBtn').addEventListener('click', () => {
+  const input = document.getElementById('manualWallet');
+  const val = input.value.trim();
+  if(!/^0x[a-fA-F0-9]{40}$/.test(val)){
+    alert('Enter a valid 0x wallet address (42 chars).');
+    return;
+  }
+  addTracked(val, null);
+  input.value = '';
+});
+
+// ---------- LIVE POLLING / ALERTS ----------
+document.getElementById('startPollBtn').addEventListener('click', startPolling);
+document.getElementById('stopPollBtn').addEventListener('click', stopPolling);
+document.getElementById('notifPermBtn').addEventListener('click', () => {
+  if('Notification' in window){
+    Notification.requestPermission().then(p => {
+      document.getElementById('notifPermBtn').textContent = p === 'granted' ? '✓ Enabled' : 'Permission denied';
+    });
+  } else {
+    alert('Browser notifications not supported here.');
+  }
+});
+
+function startPolling(){
+  if(tracked.length === 0){ alert('Track at least one wallet first.'); return; }
+  stopPolling();
+  const interval = Math.max(8, parseInt(document.getElementById('pollInterval').value,10) || 20) * 1000;
+  document.getElementById('pollStatus').textContent = 'LIVE';
+  document.getElementById('pollStatus').classList.add('live');
+  pollHandle = setInterval(pollNextWallet, interval);
+  pollNextWallet(); // fire immediately
+}
+function stopPolling(){
+  if(pollHandle) clearInterval(pollHandle);
+  pollHandle = null;
+  document.getElementById('pollStatus').textContent = 'IDLE';
+  document.getElementById('pollStatus').classList.remove('live');
+}
+
+async function pollNextWallet(){
+  if(tracked.length === 0) return;
+  // round-robin one wallet per tick to stay well within rate limits
+  const t = tracked[pollIdx % tracked.length];
+  pollIdx++;
+  try{
+    const activity = await apiGet(`/activity?user=${t.wallet}&type=TRADE&limit=10&sortBy=TIMESTAMP&sortDirection=DESC`);
+    if(!Array.isArray(activity) || activity.length === 0) return;
+
+    const newest = activity[0];
+    const isFirstCheck = t.lastSeenTx === null;
+    // find all activity newer than lastSeenTs (or just the newest item, on first check, to set baseline without spamming)
+    if(isFirstCheck){
+      t.lastSeenTs = newest.timestamp;
+      t.lastSeenTx = newest.transactionHash;
+      saveTracked();
+      return;
+    }
+    const fresh = activity.filter(a => a.timestamp > t.lastSeenTs && a.transactionHash !== t.lastSeenTx);
+    if(fresh.length > 0){
+      t.lastSeenTs = newest.timestamp;
+      t.lastSeenTx = newest.transactionHash;
+      saveTracked();
+      fresh.reverse().forEach(a => fireAlert(t, a));
+    }
+  }catch(e){
+    console.warn('poll failed for', t.wallet, e);
+  }
+}
+
+function fireAlert(trader, trade){
+  alertLog++;
+  saveAlertCount();
+  const flashOn = document.getElementById('flashToggle').checked;
+  const soundOn = document.getElementById('soundToggle').checked;
+  const notifOn = document.getElementById('notifToggle').checked;
+
+  // Feed
+  const feed = document.getElementById('feed');
+  if(feed.querySelector('.empty')) feed.innerHTML = '';
+  const sideClass = trade.side === 'BUY' ? 'side-buy' : 'side-sell';
+  const item = document.createElement('div');
+  item.className = 'feed-item' + (flashOn ? ' flash' : '');
+  item.innerHTML = `
+    <div class="top"><span>${escapeHtml(trader.name)} · <a href="https://polymarket.com/profile/${trader.wallet}" target="_blank" rel="noopener" style="color:var(--cyan); text-decoration:none;">${shortAddr(trader.wallet)} ↗</a></span><span>${new Date(trade.timestamp*1000).toLocaleTimeString()}</span></div>
+    <div><span class="${sideClass}">${trade.side}</span> ${escapeHtml(trade.outcome||'')} @ ${trade.price} — $${fmtNum(trade.usdcSize)}</div>
+    <div class="title">${escapeHtml(trade.title || '')}</div>
+  `;
+  feed.prepend(item);
+  document.getElementById('feedTag').textContent = `last: ${new Date().toLocaleTimeString()}`;
+  // keep feed reasonable length
+  while(feed.children.length > 60) feed.removeChild(feed.lastChild);
+
+  // Sound (WebAudio beep, no external asset)
+  if(soundOn) playBeep();
+
+  // Browser notification
+  if(notifOn && 'Notification' in window && Notification.permission === 'granted'){
+    new Notification(`${trader.name} just ${trade.side === 'BUY' ? 'bought' : 'sold'}`, {
+      body: `${trade.outcome || ''} — $${fmtNum(trade.usdcSize)} @ ${trade.price}\n${trade.title || ''}`
+    });
+  }
+}
+
+let audioCtx;
+function playBeep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'square';
+    o.frequency.value = 880;
+    g.gain.value = 0.06;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    // quick double-beep
+    setTimeout(()=>{ o.frequency.value = 1320; }, 90);
+    o.stop(audioCtx.currentTime + 0.22);
+  }catch(e){ console.warn('beep failed', e); }
+}
+
+// ---------- TELEGRAM BACKEND SYNC ----------
+const backendUrlInput = document.getElementById('backendUrl');
+backendUrlInput.value = localStorage.getItem('sw_backend_url') || '';
+backendUrlInput.addEventListener('change', () => {
+  localStorage.setItem('sw_backend_url', backendUrlInput.value.trim());
+});
+
+document.getElementById('syncTelegramBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('syncStatus');
+  let base = backendUrlInput.value.trim().replace(/\/$/, '');
+  if(!base){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Enter your Netlify site URL first.';
+    return;
+  }
+  localStorage.setItem('sw_backend_url', base);
+  if(tracked.length === 0){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Track at least one wallet before syncing.';
+    return;
+  }
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Syncing...';
+  try{
+    const res = await fetch(`${base}/.netlify/functions/sync-wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallets: tracked.map(t => ({ wallet: t.wallet, name: t.name })) })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error((data.error || ('HTTP ' + res.status)) + (data.message ? (' — ' + data.message) : ''));
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `Synced ${data.tracked} wallet(s) — background checks every minute now.`;
+  }catch(e){
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Sync failed: ' + e.message;
+  }
+});
+
+// ---------- INIT ----------
+document.getElementById('alertCount').textContent = alertLog;
+renderTracked();
+
+// ---------- PWA INSTALL ----------
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW registration failed', e));
+  });
+}
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if(btn) btn.style.display = 'inline-block';
+});
+document.addEventListener('DOMContentLoaded', () => {
+  const installBtn = document.getElementById('installBtn');
+  if(installBtn){
+    installBtn.addEventListener('click', async () => {
+      if(deferredInstallPrompt){
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        installBtn.style.display = 'none';
+      }
+    });
+  }
+});
+</script>
+</body>
+</html>
